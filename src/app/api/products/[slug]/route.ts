@@ -3,6 +3,8 @@ import { products, categories, reviews } from "@/db/schema";
 import { eq, sql, desc } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }

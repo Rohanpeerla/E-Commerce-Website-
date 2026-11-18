@@ -3,6 +3,8 @@ import { categories, products, reviews } from "@/db/schema";
 import { NextResponse } from "next/server";
 import { sql } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 const SEED_DATA = {
   categories: [
     {
@@ -758,12 +760,70 @@ const SEED_DATA = {
   ],
 };
 
-export async function POST() {
+async function runSeed() {
   try {
-    // Clear existing data
+    // 1. Ensure tables exist before truncating or inserting
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS categories (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        slug VARCHAR(100) NOT NULL UNIQUE,
+        description TEXT,
+        image TEXT,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS products (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) NOT NULL UNIQUE,
+        description TEXT NOT NULL,
+        short_description TEXT,
+        price DECIMAL(10, 2) NOT NULL,
+        compare_at_price DECIMAL(10, 2),
+        category_id INTEGER REFERENCES categories(id),
+        brand VARCHAR(100),
+        sku VARCHAR(50),
+        in_stock BOOLEAN DEFAULT TRUE NOT NULL,
+        featured BOOLEAN DEFAULT FALSE NOT NULL,
+        images JSONB DEFAULT '[]'::jsonb NOT NULL,
+        specs JSONB DEFAULT '{}'::jsonb NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS reviews (
+        id SERIAL PRIMARY KEY,
+        product_id INTEGER NOT NULL REFERENCES products(id),
+        author VARCHAR(100) NOT NULL,
+        rating INTEGER NOT NULL,
+        title VARCHAR(255),
+        content TEXT,
+        verified BOOLEAN DEFAULT FALSE NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        first_name VARCHAR(100) NOT NULL,
+        last_name VARCHAR(100) NOT NULL,
+        address TEXT NOT NULL,
+        city VARCHAR(100) NOT NULL,
+        state VARCHAR(100),
+        zip_code VARCHAR(20) NOT NULL,
+        country VARCHAR(100) NOT NULL,
+        phone VARCHAR(30),
+        total DECIMAL(10, 2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending' NOT NULL,
+        items JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+    `);
+
+    // 2. Clear existing data
     await db.execute(sql`TRUNCATE TABLE reviews, orders, products, categories RESTART IDENTITY CASCADE`);
 
-    // Insert categories
+    // 3. Insert categories
     const insertedCategories = await db
       .insert(categories)
       .values(SEED_DATA.categories)
@@ -771,7 +831,7 @@ export async function POST() {
 
     const categoryMap = new Map(insertedCategories.map((c) => [c.slug, c.id]));
 
-    // Insert products
+    // 4. Insert products
     const productValues = SEED_DATA.products.map((p) => ({
       name: p.name,
       slug: p.slug,
@@ -794,7 +854,7 @@ export async function POST() {
 
     const productMap = new Map(insertedProducts.map((p) => [p.slug, p.id]));
 
-    // Insert reviews
+    // 5. Insert reviews
     const reviewValues = SEED_DATA.reviews.map((r) => ({
       productId: productMap.get(r.productSlug)!,
       author: r.author,
@@ -808,6 +868,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
+      message: "Database schema verified and sample data seeded successfully!",
       counts: {
         categories: insertedCategories.length,
         products: insertedProducts.length,
@@ -821,4 +882,12 @@ export async function POST() {
       { status: 500 }
     );
   }
+}
+
+export async function POST() {
+  return runSeed();
+}
+
+export async function GET() {
+  return runSeed();
 }
