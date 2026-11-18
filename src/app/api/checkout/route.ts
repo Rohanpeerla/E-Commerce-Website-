@@ -33,6 +33,28 @@ export async function POST(request: NextRequest) {
       0
     );
 
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json({
+        order: {
+          id: Math.floor(Math.random() * 100000) + 1,
+          email,
+          firstName,
+          lastName,
+          address,
+          city,
+          state: state || "",
+          zipCode,
+          country,
+          phone: phone || "",
+          total: total.toFixed(2),
+          items,
+          status: "confirmed",
+          createdAt: new Date().toISOString(),
+        },
+        success: true,
+      });
+    }
+
     const [order] = await db
       .insert(orders)
       .values({

@@ -1,12 +1,16 @@
 import { db } from "@/db";
 import { products, categories, reviews } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
-import Link from "next/link";
 import HomeClient from "./HomeClient";
+import { getMockHomeData } from "@/lib/mockData";
 
 export const dynamic = "force-dynamic";
 
 async function getData() {
+  if (!process.env.DATABASE_URL) {
+    return getMockHomeData();
+  }
+
   try {
     // Featured products
     const featuredProducts = await db
@@ -71,13 +75,18 @@ async function getData() {
       reviewCount: statsMap.get(p.id)?.count || 0,
     });
 
+    if (featuredProducts.length === 0 && cats.length === 0) {
+      return getMockHomeData();
+    }
+
     return {
       featured: featuredProducts.map(mapProduct),
       latest: latestProducts.map(mapProduct),
       categories: cats,
     };
-  } catch {
-    return { featured: [], latest: [], categories: [] };
+  } catch (error) {
+    console.error("Database query failed, falling back to mock data:", error);
+    return getMockHomeData();
   }
 }
 

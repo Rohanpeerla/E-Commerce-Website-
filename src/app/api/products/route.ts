@@ -2,6 +2,11 @@ import { db } from "@/db";
 import { products, categories, reviews } from "@/db/schema";
 import { eq, ilike, sql, and, desc, asc } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  MOCK_PRODUCTS,
+  MOCK_CATEGORIES,
+  getProductStats,
+} from "@/lib/mockData";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +18,70 @@ export async function GET(request: NextRequest) {
   const brand = searchParams.get("brand");
   const minPrice = searchParams.get("minPrice");
   const maxPrice = searchParams.get("maxPrice");
+
+  // Fallback to mock data if DATABASE_URL is not configured
+  if (!process.env.DATABASE_URL) {
+    let list = [...MOCK_PRODUCTS];
+
+    if (category) {
+      list = list.filter((p) => p.categorySlug === category);
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.description.toLowerCase().includes(q)
+      );
+    }
+    if (brand) {
+      list = list.filter((p) => p.brand === brand);
+    }
+    if (minPrice) {
+      list = list.filter((p) => p.price >= Number(minPrice));
+    }
+    if (maxPrice) {
+      list = list.filter((p) => p.price <= Number(maxPrice));
+    }
+
+    if (sort === "price-asc") {
+      list.sort((a, b) => a.price - b.price);
+    } else if (sort === "price-desc") {
+      list.sort((a, b) => b.price - a.price);
+    } else if (sort === "name") {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    const result = list.map((p) => {
+      const stats = getProductStats(p.slug);
+      return {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        shortDescription: p.shortDescription,
+        price: p.price,
+        compareAtPrice: p.compareAtPrice,
+        brand: p.brand,
+        featured: p.featured,
+        images: p.images,
+        image: p.images[0] || "",
+        avgRating: stats.avgRating,
+        reviewCount: stats.reviewCount,
+      };
+    });
+
+    const brands = Array.from(
+      new Set(MOCK_PRODUCTS.map((p) => p.brand))
+    ).filter(Boolean);
+
+    return NextResponse.json({
+      products: result,
+      filters: {
+        brands,
+        categories: MOCK_CATEGORIES,
+      },
+    });
+  }
 
   try {
     const conditions = [];

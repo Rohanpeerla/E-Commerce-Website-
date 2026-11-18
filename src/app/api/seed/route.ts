@@ -761,6 +761,19 @@ const SEED_DATA = {
 };
 
 async function runSeed() {
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json({
+      success: true,
+      message:
+        "Running in demo mode. All products and categories are available directly without an external database. If you wish to connect a permanent PostgreSQL database, configure DATABASE_URL in your Vercel project environment variables and revisit this endpoint.",
+      counts: {
+        categories: SEED_DATA.categories.length,
+        products: SEED_DATA.products.length,
+        reviews: SEED_DATA.reviews.length,
+      },
+    });
+  }
+
   try {
     // 1. Ensure tables exist before truncating or inserting
     await db.execute(sql`
